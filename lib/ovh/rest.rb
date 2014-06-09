@@ -45,19 +45,26 @@ module OVH
 
         url = @api_url + endpoint
         uri = URI.parse(url)
-        body = payload.to_json unless payload.nil?
+        body = nil
+
+        if payload
+          method.eql?(:get) ? uri.query = URI.encode_www_form(payload) : body = payload.to_json
+        end
 
         # create OVH authentication headers
-        headers = build_headers(method, url, body)
+        headers = build_headers(method, uri.to_s, body)
 
         # instanciate Net::HTTP::Get, Post, Put or Delete class
-        request = Net::HTTP.const_get(method.capitalize).new(uri.path, initheader = headers)
+        request_uri = uri.path
+        request_uri += '?' + uri.query if uri.query
+        request = Net::HTTP.const_get(method.capitalize).new(request_uri, initheader = headers)
         request.body = body
 
         http = REST.build_http_object(uri.host, uri.port)
         http.use_ssl = true
         response = http.request(request)
-        result = JSON.parse(response.body)
+        result = nil
+        result = JSON.parse(response.body) unless response.body.eql?"null"
 
         unless response.is_a?(Net::HTTPSuccess)
           raise RESTError, "Error querying #{endpoint}: #{result["message"]}"
